@@ -1,10 +1,67 @@
 \section{Introduction}
+
+In this report, the Visual Image Transformer (VIT) from the paper "An Image is worth 16x16 words" \cite{dosovitskiy2021imageworth16x16words} was self implemented and validated on the CIFAR-10 Classification Task.
+Different parameters for the model are compared: Data: augmentation <-> no augmentation, Model: hidden dimension + depths, on 3 seeds. Results are presented as std and mean +-.
+In (Results / Discussion)? the importance of different areas of the image are reviewed (what the model thinks) with the help of compution Shapely Vales \cite{rozemberczki2022shapleyvaluemachinelearning}
+The code can be found at https://github.com/Tims0204/Project2.
 \section{Methology}
+
+In this section ...
 \subsection{Data}
+
+The CIFAR-10 \cite{cifar10} dataset is a collection of 60.000 32x32 color images, spanning over 10 different classes. The classes represent airplanes, cars, birds, cats, deer, dogs, frogs, horses, ships and trucks resulting in ~5000 images per class. 
+CIFAR-10 is commonly used to train machine learning and computer vision algorithms. [image]
 \subsubsection{Augmentation}
+To prevent overfitting, which we will see in the Result \ref{result}, we augment the data by the following: 
+1. we normalize the both the test and train images on the GPU. 
+The Trainingimages are further augmented via randomly cropping, with padding = 4, randomly horizontally flipped with 50%
+as well as Torchs' AutoAugment data augmentation method based on "AutoAugment: Learning Augmentation Strategies from Data" \cite{cubuk2019autoaugmentlearningaugmentationpolicies}, consisting of 25(!) additional augmentation operations, spezialised for CIRFAR-10.
+
 \subsection{VIT-Architecture}
+The implemented model follows \cite{dosovitskiy2021imageworth16x16words}.
+The image is separated into patches of size $P$:
+\begin{equation}
+\mathbf{x} \in \mathbb{R}^{H \times W \times C}, \qquad
+N = \frac{HW}{P^2}, \qquad
+\mathbf{x}_p \in \mathbb{R}^{N \times (P^2 C)}
+\end{equation}
+which are embedded with a simple learnable patch embedding:
+\begin{equation}
+\mathbf{E} \in \mathbb{R}^{(P^2 C) \times D}, \qquad
+\mathbf{e}_i = \mathbf{x}_p^{i}\,\mathbf{E}, \quad i = 1,\dots,N
+\end{equation}
+A class token is prepended and a learnable positional encoding is added:
+\begin{equation}
+\mathbf{z}_0 = \left[\mathbf{x}_{\mathrm{cls}};\ \mathbf{e}_1;\ \dots;\ \mathbf{e}_N\right] + \mathbf{E}_{\mathrm{pos}},
+\quad \mathbf{E}_{\mathrm{pos}} \in \mathbb{R}^{(N+1) \times D},
+\quad \mathbf{E}_{\mathrm{pos}} \sim \mathcal{TN}(0,\,0.02^2)
+\end{equation}
+All tokens are then fed into the Transformer encoder consisting of layer normalization, multi-head attention and an MLP ($\ell = 1,\dots,L$):
+\begin{align}
+\mathbf{z}'_\ell &= \mathrm{MHA}\big(\mathrm{LN}(\mathbf{z}_{\ell-1})\big) + \mathbf{z}_{\ell-1} \\
+\mathbf{z}_\ell  &= \mathrm{MLP}\big(\mathrm{LN}(\mathbf{z}'_\ell)\big) + \mathbf{z}'_\ell
+\end{align}
+With $h$ heads and $d_h = D/h$:
+\begin{align}
+\mathbf{Q}_i &= \mathbf{z}\mathbf{W}_i^{Q}, \quad
+\mathbf{K}_i = \mathbf{z}\mathbf{W}_i^{K}, \quad
+\mathbf{V}_i = \mathbf{z}\mathbf{W}_i^{V} \\
+\mathrm{head}_i &= \mathrm{softmax}\!\left(\frac{\mathbf{Q}_i \mathbf{K}_i^{\top}}{\sqrt{d_h}}\right)\mathbf{V}_i \\
+\mathrm{MHA}(\mathbf{z}) &= \mathrm{Concat}(\mathrm{head}_1,\dots,\mathrm{head}_h)\,\mathbf{W}^{O}
+\end{align}
+The MLP has expansion factor $m$:
+\begin{equation}
+\mathrm{MLP}(\mathbf{z}) = \mathrm{GELU}(\mathbf{z}\mathbf{W}_1 + \mathbf{b}_1)\,\mathbf{W}_2 + \mathbf{b}_2,
+\quad \mathbf{W}_1 \in \mathbb{R}^{D \times mD},\ \mathbf{W}_2 \in \mathbb{R}^{mD \times D}
+\end{equation}
+Classification uses only the class token:
+\begin{equation}
+\mathbf{y} = \mathrm{LN}\big(\mathbf{z}_L^{0}\big), \qquad
+\hat{\mathbf{p}} = \mathrm{softmax}(\mathbf{y}\mathbf{W}_{\mathrm{head}} + \mathbf{b}_{\mathrm{head}})
+\end{equation}
+
 \subsection{Experimental Setup}
-\section{Results}
+\section{Results} \label{result}
 \section{Discussion}
 \section{Usage of AI} AI tools were used in this report to help me understand the mathematical derivation of the optimizers, improve the phrasing and shortening of certain passages, debug code, and generate code for visualisations. The implementation of the optimizers, the experimental design, and the interpretation of the results were carried out as part of my own work.
 

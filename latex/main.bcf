@@ -2361,6 +2361,11 @@
     <bcf:datasource type="file" datatype="bibtex" glob="false">references.bib</bcf:datasource>
   </bcf:bibdata>
   <bcf:section number="0">
+    <bcf:citekey order="1" intorder="1">dosovitskiy2021imageworth16x16words</bcf:citekey>
+    <bcf:citekey order="2" intorder="1">rozemberczki2022shapleyvaluemachinelearning</bcf:citekey>
+    <bcf:citekey order="3" intorder="1">cifar10</bcf:citekey>
+    <bcf:citekey order="4" intorder="1">cubuk2019autoaugmentlearningaugmentationpolicies</bcf:citekey>
+    <bcf:citekey order="5" intorder="1">dosovitskiy2021imageworth16x16words</bcf:citekey>
   </bcf:section>
   <!-- SORTING TEMPLATES -->
   <bcf:sortingtemplate name="nty">

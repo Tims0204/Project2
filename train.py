@@ -31,6 +31,7 @@ def train():
     parser.add_argument("--warmup_epochs", default=5, type=int)
     parser.add_argument("--momentum", default=0.9, type=float)
     parser.add_argument("--weight_decay", default=0.0, type=float)
+    parser.add_argument("--no_augment", action="store_true")
 
     parser.add_argument("--out", default=None, type=str)
 
@@ -42,7 +43,7 @@ def train():
     # DATA
 
     train_images, train_labels, test_images, test_labels = load_data()
-
+    train_transform = None if args.no_augment else train_transform
     train_dataset = CIFAR10Dataset(train_images, train_labels, transform=train_transform)
     test_dataset = CIFAR10Dataset(test_images, test_labels, transform=test_transform)
 
