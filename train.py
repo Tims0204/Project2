@@ -18,7 +18,7 @@ def train():
     parser.add_argument("--batch_size", default=512, type=int)
     parser.add_argument("--num_workers", default=4, type=int)
 
-    parser.add_argument("--patch_size", default=16, type=int)
+    parser.add_argument("--patch_size", default=4, type=int)
     parser.add_argument("--hidden_dim", default=768, type=int)
     parser.add_argument("--num_heads", default=12, type=int)
     parser.add_argument("--depth", default=6, type=int)
@@ -69,6 +69,13 @@ def train():
     # MODEL INIT
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    mean = torch.tensor([0.4914, 0.4822, 0.4465], device=device).view(1, 3, 1, 1)
+    std  = torch.tensor([0.2470, 0.2435, 0.2616], device=device).view(1, 3, 1, 1)
+
+    def gpu_prep(x):
+        x = x.to(device, non_blocking=True).float().div_(255)
+        return (x - mean) / std
     
     model = FullModel(H=H, C=C, P=args.patch_size, D=args.hidden_dim, num_heads=args.num_heads, mlp_mult=args.mlp_mult, depth=args.depth).to(device)
 
@@ -119,7 +126,7 @@ def train():
 
         for images, labels in train_loader:
 
-            images = images.to(device, non_blocking=True)
+            images = gpu_prep(images)                       
             labels = labels.to(device, non_blocking=True)
 
             optimizer.zero_grad()
@@ -150,8 +157,8 @@ def train():
 
             for images, labels in test_loader:
 
-                images = images.to(device)
-                labels = labels.to(device)
+                images = gpu_prep(images)                     
+                labels = labels.to(device, non_blocking=True)
 
                 outputs = model(images)
                 predictions = outputs.argmax(dim=1)
@@ -174,13 +181,29 @@ def train():
         history["lr"].append(optimizer.param_groups[0]["lr"])
 
         scheduler.step()
-    if args.out is not None:
-        out_dir = os.path.dirname(args.out)
-        if out_dir:
-            os.makedirs(out_dir, exist_ok=True)
-        with open(args.out, "w") as f:
-            json.dump({"args": vars(args), "history": history}, f, indent=2)
-        print(f"Gespeichert: {args.out}")
+        if args.out is not None:
+            out_dir = os.path.dirname(args.out)
+            if out_dir:
+                os.makedirs(out_dir, exist_ok=True)
+
+            # History + Args (wie bisher)
+            with open(args.out, "w") as f:
+                json.dump({"args": vars(args), "history": history}, f, indent=2)
+            print(f"Gespeichert: {args.out}")
+
+            # Modell: neben der JSON, mit Endung .pt
+            ckpt_path = args.out + ".pt"
+            torch.save({
+                "state_dict": model.state_dict(),
+                "args": vars(args),
+                "model_kwargs": dict(
+                    H=H, C=C, P=args.patch_size, D=args.hidden_dim,
+                    num_heads=args.num_heads, mlp_mult=args.mlp_mult, depth=args.depth,
+                ),
+                "epoch": args.epochs,
+                "test_acc": history["test_acc"][-1],
+            }, ckpt_path)
+            print(f"Modell gespeichert: {ckpt_path}")
 
 
 if __name__=="__main__":

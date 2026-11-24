@@ -1,59 +1,32 @@
 import torch
 from torch.utils.data import Dataset
 from PIL import Image
+import numpy as np
 
 from datasets import load_dataset
 
 def load_data():
+    # the old convert to float is unnessesary and costs performance
+    ds = load_dataset("uoft-cs/cifar10")
+    def to_np(split):
+        x = np.stack([np.array(img.convert("RGB")) for img in split["img"]])  # uint8, NHWC
+        return x, np.array(split["label"])
+    xtr, ytr = to_np(ds["train"]); xte, yte = to_np(ds["test"])
+    return xtr, ytr, xte, yte
 
-    dataset = load_dataset("uoft-cs/cifar10")
 
-    train_dataset = dataset["train"]
-    test_dataset = dataset["test"]
-
-    print("Size of TrainDataset: ", len(train_dataset))  # 50000
-    print("Size of TrainDataset: ", len(test_dataset))   # 10000
-
-
-    import numpy as np
-
-    hf_train = dataset["train"]
-    hf_test = dataset["test"]
-
-    train_images = np.stack([
-        np.array(img.convert("RGB"))
-        for img in hf_train["img"]
-    ]).astype(np.float32) / 255.0
-
-    train_labels = np.array(hf_train["label"])
-
-    test_images = np.stack([
-        np.array(img.convert("RGB"))
-        for img in hf_test["img"]
-    ]).astype(np.float32) / 255.0
-
-    test_labels = np.array(hf_test["label"])
-
-    return train_images, train_labels, test_images, test_labels
 
 class CIFAR10Dataset(Dataset):
     def __init__(self, images, labels, transform):
-        self.images = images
-        self.labels = labels
+        self.images = torch.from_numpy(images).permute(0, 3, 1, 2).contiguous()
+        self.labels = torch.from_numpy(labels).long()
         self.transform = transform
 
     def __len__(self):
         return len(self.images)
 
     def __getitem__(self, idx):
-        image = self.images[idx]
-        label = self.labels[idx]
-
-        image = Image.fromarray((image * 255).astype("uint8"))
-
-        label = torch.tensor(label, dtype=torch.long)
-
-        if self.transform:
-            image = self.transform(image)
-
-        return image, label
+        x = self.images[idx]                    # uint8 Tensor [3,32,32]
+        if self.transform: 
+            x = self.transform(x)
+        return x, self.labels[idx]              # uint8 
