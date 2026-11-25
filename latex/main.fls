@@ -286,6 +286,12 @@ INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/fourier/fourier-alt.tfm
 INPUT /usr/share/texlive/texmf-dist/fonts/vf/public/fourier/futr8t.vf
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/fourier/futr8r.tfm
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/fourier/fourier-alt.tfm
+INPUT /usr/share/texlive/texmf-dist/tex/latex/fourier/ts1futs.fd
+INPUT /usr/share/texlive/texmf-dist/tex/latex/fourier/ts1futs.fd
+INPUT /usr/share/texlive/texmf-dist/tex/latex/fourier/ts1futs.fd
+INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/fourier/futr8c.tfm
+INPUT /usr/share/texlive/texmf-dist/fonts/vf/public/fourier/futr8c.vf
+INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/fourier/fourier-orns.tfm
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/fourier/futri8t.tfm
 INPUT /usr/share/texlive/texmf-dist/tex/latex/base/t1cmtt.fd
 INPUT /usr/share/texlive/texmf-dist/tex/latex/base/t1cmtt.fd
@@ -295,8 +301,8 @@ INPUT /usr/share/texlive/texmf-dist/fonts/vf/public/fourier/futri8t.vf
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/fourier/fourier-alt-ita.tfm
 INPUT /usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-t1.enc
 INPUT main.aux
-INPUT main.run.xml
 OUTPUT main.run.xml
+INPUT /usr/share/texlive/texmf-dist/fonts/type1/public/fourier/fourier-alt.pfb
 INPUT /usr/share/texlive/texmf-dist/fonts/type1/public/fourier/fourier-bb.pfb
 INPUT /usr/share/texlive/texmf-dist/fonts/type1/public/fourier/fourier-mcl.pfb
 INPUT /usr/share/texlive/texmf-dist/fonts/type1/public/fourier/fourier-mex.pfb

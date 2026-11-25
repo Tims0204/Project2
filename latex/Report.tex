@@ -2,7 +2,7 @@
 
 In this report, the Visual Image Transformer (VIT) from the paper "An Image is worth 16x16 words" \cite{dosovitskiy2021imageworth16x16words} was self implemented and validated on the CIFAR-10 Classification Task.
 Different parameters for the model are compared: Data: augmentation <-> no augmentation, Model: hidden dimension + depths, on 3 seeds. Results are presented as std and mean +-.
-In (Results / Discussion)? the importance of different areas of the image are reviewed (what the model thinks) with the help of compution Shapely Vales \cite{rozemberczki2022shapleyvaluemachinelearning}
+In (Results / Discussion)? the importance of different areas of the image are reviewed (what the model thinks) with the help of computing Shapely Vales \cite{rozemberczki2022shapleyvaluemachinelearning}
 The code can be found at https://github.com/Tims0204/Project2.
 \section{Methology}
 
@@ -11,6 +11,7 @@ In this section ...
 
 The CIFAR-10 \cite{cifar10} dataset is a collection of 60.000 32x32 color images, spanning over 10 different classes. The classes represent airplanes, cars, birds, cats, deer, dogs, frogs, horses, ships and trucks resulting in ~5000 images per class. 
 CIFAR-10 is commonly used to train machine learning and computer vision algorithms. [image]
+The Data originates from Huggingsface with an official CIFAR-10 standard split: train: 50.000, test 10.000.
 \subsubsection{Augmentation}
 To prevent overfitting, which we will see in the Result \ref{result}, we augment the data by the following: 
 1. we normalize the both the test and train images on the GPU. 
@@ -61,8 +62,65 @@ Classification uses only the class token:
 \end{equation}
 
 \subsection{Experimental Setup}
+The model used these hyperparameter (table) : parser.add_argument("--batch_size", default=512, type=int)
+    parser.add_argument("--num_workers", default=4, type=int)
+
+    parser.add_argument("--patch_size", default=4, type=int)
+    parser.add_argument("--hidden_dim", default=768, type=int)
+    parser.add_argument("--num_heads", default=12, type=int)
+    parser.add_argument("--depth", default=6, type=int)
+    parser.add_argument("--mlp_mult", default=4, type=int)
+    parser.add_argument("--seed", default=42, type=int)
+
+    parser.add_argument("--epochs", default=50, type=int)
+    parser.add_argument("--optimizer",choices=["SGD", "AdamW"],default="AdamW",type=str)
+    parser.add_argument("--lr", default=0.001, type=float)
+    parser.add_argument("--warmup_epochs", default=5, type=int)
+    parser.add_argument("--momentum", default=0.9, type=float)
+    parser.add_argument("--weight_decay", default=0.0, type=float)
+    parser.add_argument("--no_augment", action="store_true")
+
+    with AdamW optimizer. With variing hidden-dim € {96, 192, 384, 784} and varring depth {2, 4, 6}, compared the augmented and the non augmented runs, resulting in 12 x 2 = 24 runs.
+    Both models were trained on a single GPU NVIDIA RTX 4500 Ada Generation with CUDA Version: 12.2.
 \section{Results} \label{result}
+table_augment( hd  nh  depth  n params (M) test_final (%) test_best (%) train (%) gap (pp)  loss best_ep
+ 96   6      2  3       0.24   75.95 ± 0.23  76.13 ± 0.15     70.04    -5.91 0.844      95
+ 96   6      4  3       0.46   81.33 ± 0.09  81.49 ± 0.20     78.27    -3.07 0.617      94
+ 96   6      6  3       0.68   83.03 ± 0.52  83.16 ± 0.46     81.33    -1.70 0.531      92
+192   6      2  3       0.91   81.12 ± 0.29  81.17 ± 0.33     78.78    -2.33 0.601      97
+192   6      4  3       1.80   85.78 ± 0.27  85.79 ± 0.29     88.12     2.34 0.345      94
+192   6      6  3       2.69   87.01 ± 0.35  87.05 ± 0.34     91.11     4.10 0.257      90
+384   6      2  3       3.60   83.06 ± 0.36  83.17 ± 0.26     85.66     2.60 0.411      94
+384   6      4  3       7.15   87.98 ± 0.30  88.11 ± 0.32     92.86     4.87 0.208      91
+384   6      6  3      10.70   88.61 ± 0.06  88.69 ± 0.01     94.38     5.77 0.164      96
+768   6      2  3      14.27   83.26 ± 0.18  83.34 ± 0.25     86.59     3.32 0.385      96
+768   6      4  3      28.45   88.68 ± 0.32  88.75 ± 0.26     93.72     5.04 0.184      98
+768   6      6  3      42.62   88.06 ± 0.99  88.15 ± 1.00     92.74     4.68 0.208      95)
+
+table_non_augment(
+     d  nh  depth  n params (M) test_final (%) test_best (%) train (%) gap (pp)  loss best_ep      ep100
+ 96   6      2  3       0.24   64.34 ± 0.18  65.67 ± 0.32    100.00    35.66 0.001      20 54 (52-56)
+ 96   6      4  3       0.46   67.34 ± 0.70  67.39 ± 0.72    100.00    32.66 0.000      79 47 (46-47)
+ 96   6      6  3       0.68   68.68 ± 0.27  68.70 ± 0.28    100.00    31.32 0.000      84 52 (50-55)
+192   6      2  3       0.91   66.86 ± 0.52  66.90 ± 0.50    100.00    33.14 0.000      81 38 (36-39)
+192   6      4  3       1.80   70.02 ± 0.21  70.06 ± 0.25    100.00    29.98 0.000      85 49 (45-51)
+192   6      6  3       2.69   70.71 ± 0.37  70.75 ± 0.40    100.00    29.29 0.000      89 58 (56-61)
+384   6      2  3       3.60   68.39 ± 0.88  68.41 ± 0.86    100.00    31.61 0.000      81 50 (48-53)
+384   6      4  3       7.15   70.72 ± 0.73  70.72 ± 0.74    100.00    29.28 0.000      89 60 (57-61)
+384   6      6  3      10.70   70.89 ± 0.64  70.90 ± 0.62    100.00    29.11 0.000      92 64 (62-66)
+768   6      2  3      14.27   66.95 ± 0.62  66.96 ± 0.61    100.00    33.05 0.000      89 56 (53-61)
+
+... hier fehlen noch 5 runs % Die Spalte ep100 zeigt Mittel (min-max) der ersten Epoche mit train_acc >= THRESH. Bei [k/n] haben nur k von n Seeds den Wert erreicht, bei nie keiner.
+)
+
+images mit Shapely Values die Heatmap der Patches zeigen.
+
+3 Bereiche: 
+    depth and hiddendim does help the model to generalize. It does still overfit, but the accuracy increasis to 88.61. depth seems to always help the model, (currently testing on epochs 200 as the model didnt converge, highest hidden_dim, highest depth, highest num_heads)
+    augment vs non_augment. non_augment did perform way worse than expected. The models memorize the data completely, interestengly the smallest model even after 20 epochs.
+    images mit Shapely Values die Heatmap der Patches zeigen. comparasion of small and big models. I assume, that small models will also try to learn the background (plane -> sky) and the big models will try to segment the object to classify from the background.
 \section{Discussion}
+...
 \section{Usage of AI} AI tools were used in this report to help me understand the mathematical derivation of the optimizers, improve the phrasing and shortening of certain passages, debug code, and generate code for visualisations. The implementation of the optimizers, the experimental design, and the interpretation of the results were carried out as part of my own work.
 
 Since the primary objective of this report was to explore and understand the differences between gradient-based optimizers, I hope that the use of AI described above is consistent with the assignment requirements.
