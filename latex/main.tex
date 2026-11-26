@@ -1,20 +1,23 @@
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Main document
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\documentclass[paper=a4, fontsize=11pt]{scrartcl}
+\documentclass[paper=a4, fontsize=10pt]{scrartcl}
 
 %%% Packages
 \usepackage[T1]{fontenc}
 \usepackage{fourier}
 \usepackage[english]{babel}
 \usepackage[protrusion=true,expansion=true]{microtype}
+\usepackage[margin=2.5cm]{geometry}
 \usepackage{amsmath,amsfonts,amsthm}
 \usepackage{graphicx}
 \usepackage{url}
 \usepackage{float}
 \usepackage{booktabs}
+\usepackage{array}
+\usepackage{caption}
+\captionsetup{font=small, skip=3pt}
 
 %%% Bibliography
 \usepackage[
@@ -24,9 +27,35 @@
 
 \addbibresource{references.bib}
 
-%%% Section formatting
+%%% Section formatting (zentriert, Small Caps)
 \usepackage{sectsty}
 \allsectionsfont{\centering \normalfont\scshape}
+\setkomafont{disposition}{\normalfont\scshape}
+\addtokomafont{section}{\centering}
+\addtokomafont{subsection}{\centering}
+\addtokomafont{subsubsection}{\centering}
+
+%%% Abstände der Überschriften
+\RedeclareSectionCommand[beforeskip=2.5ex plus .5ex minus .2ex, afterskip=1.2ex plus .2ex]{section}
+\RedeclareSectionCommand[beforeskip=2ex plus .4ex minus .2ex, afterskip=1ex plus .2ex]{subsection}
+\RedeclareSectionCommand[beforeskip=1.5ex plus .3ex minus .2ex, afterskip=0.8ex]{subsubsection}
+
+%%% Compact floats and equations
+\setlength{\floatsep}{6pt plus 2pt minus 2pt}
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.9}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.8}
+\setlength{\abovedisplayskip}{4pt plus 2pt minus 2pt}
+\setlength{\belowdisplayskip}{4pt plus 2pt minus 2pt}
+\setlength{\abovedisplayshortskip}{2pt plus 1pt}
+\setlength{\belowdisplayshortskip}{2pt plus 1pt}
+
+%%% Compact bibliography
+\renewcommand*{\bibfont}{\footnotesize}
+\setlength{\bibitemsep}{0pt}
 
 %%% Header and footer
 \usepackage{fancyhdr}
@@ -53,12 +82,12 @@
 \makeatletter
 \renewcommand{\maketitle}{
     \begin{center}
-        \vspace*{-1cm}
+        \vspace*{-1.5cm}
         {\large Self-Implemented VIT to classify CIFAR-10\par}
-        \vspace{15pt}
+        \vspace{8pt}
         {\normalsize Tim Sieber\par}
         {\normalsize \today\par}
-        \vspace{20pt}
+        \vspace{10pt}
     \end{center}
 }
 \makeatother

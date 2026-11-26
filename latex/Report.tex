@@ -1,126 +1,196 @@
 \section{Introduction}
 
-In this report, the Visual Image Transformer (VIT) from the paper "An Image is worth 16x16 words" \cite{dosovitskiy2021imageworth16x16words} was self implemented and validated on the CIFAR-10 Classification Task.
-Different parameters for the model are compared: Data: augmentation <-> no augmentation, Model: hidden dimension + depths, on 3 seeds. Results are presented as std and mean +-.
-In (Results / Discussion)? the importance of different areas of the image are reviewed (what the model thinks) with the help of computing Shapely Vales \cite{rozemberczki2022shapleyvaluemachinelearning}
-The code can be found at https://github.com/Tims0204/Project2.
-\section{Methology}
+The Vision Transformer (ViT)~\cite{dosovitskiy2021imageworth16x16words} showed that a pure attention-based model on image patches can compete with convolutional networks. We implement a ViT from scratch and evaluate it on CIFAR-10~\cite{cifar10}, studying the effect of model capacity (hidden dimension and depth) and data augmentation. Every configuration is trained with three seeds and reported as mean $\pm$ standard deviation. Beyond accuracy, we estimate Shapley values~\cite{rozemberczki2022shapleyvaluemachinelearning} for individual image patches to analyse which regions the models rely on.
 
-In this section ...
+The code is available at \url{https://github.com/Tims0204/Project2}.
+
+\section{Methodology}
+
 \subsection{Data}
 
-The CIFAR-10 \cite{cifar10} dataset is a collection of 60.000 32x32 color images, spanning over 10 different classes. The classes represent airplanes, cars, birds, cats, deer, dogs, frogs, horses, ships and trucks resulting in ~5000 images per class. 
-CIFAR-10 is commonly used to train machine learning and computer vision algorithms. [image]
-The Data originates from Huggingsface with an official CIFAR-10 standard split: train: 50.000, test 10.000.
-\subsubsection{Augmentation}
-To prevent overfitting, which we will see in the Result \ref{result}, we augment the data by the following: 
-1. we normalize the both the test and train images on the GPU. 
-The Trainingimages are further augmented via randomly cropping, with padding = 4, randomly horizontally flipped with 50%
-as well as Torchs' AutoAugment data augmentation method based on "AutoAugment: Learning Augmentation Strategies from Data" \cite{cubuk2019autoaugmentlearningaugmentationpolicies}, consisting of 25(!) additional augmentation operations, spezialised for CIRFAR-10.
+CIFAR-10~\cite{cifar10} consists of 60{,}000 colour images ($32\times32$) in 10 balanced classes (airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck). We use the official split from the Hugging Face dataset \texttt{uoft-cs/cifar10} with 50{,}000 training and 10{,}000 test images. The split is identical for all runs, so the seed only affects weight initialisation, batch order and augmentation. There is no separate validation set and all hyperparameters are fixed in advance, so we report the test accuracy after the last epoch.
 
-\subsection{VIT-Architecture}
-The implemented model follows \cite{dosovitskiy2021imageworth16x16words}.
-The image is separated into patches of size $P$:
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\linewidth]{images/cifar10_examples.png}
+  \caption{Examples from CIFAR-10.}
+  \label{fig:cifar}
+\end{figure}
+
+\subsubsection{Augmentation}
+\label{sec:augmentation}
+
+Without augmentation, the models memorise the training set (see Section~\ref{result}). We therefore compare two settings.
+
+\textbf{No augmentation.} Images are only normalised per channel with the CIFAR-10 mean and standard deviation. Normalisation is performed on the GPU for both training and test images.
+
+\textbf{Augmentation.} In addition to the normalisation, each training image is passed through the following transformations:
+\begin{itemize}
+  \setlength{\itemsep}{0pt}\setlength{\topsep}{2pt}
+  \item random crop with a padding of 4 pixels,
+  \item random horizontal flip with probability 0.5,
+  \item the CIFAR-10 AutoAugment policy of Torchvision~\cite{cubuk2019autoaugmentlearningaugmentationpolicies}, which consists of 25 learned sub-policies, each combining two image operations.
+\end{itemize}
+The test images are never augmented.
+
+\subsection{ViT Architecture}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{images/image.png}
+  \caption{ViT architecture.}
+  \label{fig:vit}
+\end{figure}
+
+Our implementation follows~\cite{dosovitskiy2021imageworth16x16words}. An image $\mathbf{x}\in\mathbb{R}^{H\times W\times C}$ is split into $N = HW/P^2$ non-overlapping patches of size $P\times P$, which are flattened to $\mathbf{x}_p\in\mathbb{R}^{N\times(P^2C)}$. With $H=W=32$ and $P=4$ this gives $N=64$ patches. Each patch is linearly embedded into $D$ dimensions:
 \begin{equation}
-\mathbf{x} \in \mathbb{R}^{H \times W \times C}, \qquad
-N = \frac{HW}{P^2}, \qquad
-\mathbf{x}_p \in \mathbb{R}^{N \times (P^2 C)}
+\mathbf{e}_i = \mathbf{x}_p^{i}\,\mathbf{E}, \qquad \mathbf{E}\in\mathbb{R}^{(P^2C)\times D}, \quad i=1,\dots,N .
 \end{equation}
-which are embedded with a simple learnable patch embedding:
+(In the code this is a convolution with kernel size and stride $P$, which is equivalent.) A learnable class token is prepended, and a learnable positional embedding is added:
 \begin{equation}
-\mathbf{E} \in \mathbb{R}^{(P^2 C) \times D}, \qquad
-\mathbf{e}_i = \mathbf{x}_p^{i}\,\mathbf{E}, \quad i = 1,\dots,N
+\mathbf{z}_0 = \left[\mathbf{x}_{\mathrm{cls}};\,\mathbf{e}_1;\,\dots;\,\mathbf{e}_N\right] + \mathbf{E}_{\mathrm{pos}},
+\qquad \mathbf{E}_{\mathrm{pos}}\in\mathbb{R}^{(N+1)\times D},
 \end{equation}
-A class token is prepended and a learnable positional encoding is added:
-\begin{equation}
-\mathbf{z}_0 = \left[\mathbf{x}_{\mathrm{cls}};\ \mathbf{e}_1;\ \dots;\ \mathbf{e}_N\right] + \mathbf{E}_{\mathrm{pos}},
-\quad \mathbf{E}_{\mathrm{pos}} \in \mathbb{R}^{(N+1) \times D},
-\quad \mathbf{E}_{\mathrm{pos}} \sim \mathcal{TN}(0,\,0.02^2)
-\end{equation}
-All tokens are then fed into the Transformer encoder consisting of layer normalization, multi-head attention and an MLP ($\ell = 1,\dots,L$):
+where $\mathbf{E}_{\mathrm{pos}}$ and $\mathbf{x}_{\mathrm{cls}}$ are initialised from a truncated normal distribution with standard deviation $0.02$.
+
+The tokens are processed by $L$ pre-norm Transformer blocks, each consisting of multi-head self-attention (MHA) and an MLP with residual connections:
 \begin{align}
-\mathbf{z}'_\ell &= \mathrm{MHA}\big(\mathrm{LN}(\mathbf{z}_{\ell-1})\big) + \mathbf{z}_{\ell-1} \\
-\mathbf{z}_\ell  &= \mathrm{MLP}\big(\mathrm{LN}(\mathbf{z}'_\ell)\big) + \mathbf{z}'_\ell
+\mathbf{z}'_\ell &= \mathrm{MHA}\big(\mathrm{LN}(\mathbf{z}_{\ell-1})\big) + \mathbf{z}_{\ell-1}, \\
+\mathbf{z}_\ell  &= \mathrm{MLP}\big(\mathrm{LN}(\mathbf{z}'_\ell)\big) + \mathbf{z}'_\ell, \qquad \ell=1,\dots,L .
 \end{align}
-With $h$ heads and $d_h = D/h$:
+With $h$ heads and head dimension $d_h=D/h$, attention is computed as
 \begin{align}
-\mathbf{Q}_i &= \mathbf{z}\mathbf{W}_i^{Q}, \quad
-\mathbf{K}_i = \mathbf{z}\mathbf{W}_i^{K}, \quad
-\mathbf{V}_i = \mathbf{z}\mathbf{W}_i^{V} \\
-\mathrm{head}_i &= \mathrm{softmax}\!\left(\frac{\mathbf{Q}_i \mathbf{K}_i^{\top}}{\sqrt{d_h}}\right)\mathbf{V}_i \\
-\mathrm{MHA}(\mathbf{z}) &= \mathrm{Concat}(\mathrm{head}_1,\dots,\mathrm{head}_h)\,\mathbf{W}^{O}
+\mathrm{head}_i &= \mathrm{softmax}\!\left(\frac{\mathbf{Q}_i\mathbf{K}_i^{\top}}{\sqrt{d_h}}\right)\mathbf{V}_i, \\
+\mathrm{MHA}(\mathbf{z}) &= \mathrm{Concat}(\mathrm{head}_1,\dots,\mathrm{head}_h)\,\mathbf{W}^{O},
 \end{align}
-The MLP has expansion factor $m$:
+with $\mathbf{Q}_i=\mathbf{z}\mathbf{W}_i^{Q}$, $\mathbf{K}_i=\mathbf{z}\mathbf{W}_i^{K}$ and $\mathbf{V}_i=\mathbf{z}\mathbf{W}_i^{V}$. The MLP uses an expansion factor $m$ and a GELU activation:
 \begin{equation}
-\mathrm{MLP}(\mathbf{z}) = \mathrm{GELU}(\mathbf{z}\mathbf{W}_1 + \mathbf{b}_1)\,\mathbf{W}_2 + \mathbf{b}_2,
-\quad \mathbf{W}_1 \in \mathbb{R}^{D \times mD},\ \mathbf{W}_2 \in \mathbb{R}^{mD \times D}
+\mathrm{MLP}(\mathbf{z}) = \mathrm{GELU}(\mathbf{z}\mathbf{W}_1+\mathbf{b}_1)\,\mathbf{W}_2+\mathbf{b}_2,
+\qquad \mathbf{W}_1\in\mathbb{R}^{D\times mD},\ \mathbf{W}_2\in\mathbb{R}^{mD\times D}.
 \end{equation}
-Classification uses only the class token:
+Only the final class token is used for classification:
 \begin{equation}
-\mathbf{y} = \mathrm{LN}\big(\mathbf{z}_L^{0}\big), \qquad
-\hat{\mathbf{p}} = \mathrm{softmax}(\mathbf{y}\mathbf{W}_{\mathrm{head}} + \mathbf{b}_{\mathrm{head}})
+\hat{\mathbf{p}} = \mathrm{softmax}\!\big(\mathrm{LN}(\mathbf{z}_L^{0})\,\mathbf{W}_{\mathrm{head}}+\mathbf{b}_{\mathrm{head}}\big).
 \end{equation}
+Layer normalisation, the attention mechanism and the cross-entropy loss are implemented by hand, without the corresponding PyTorch modules. For optimisation we use the AdamW implementation of PyTorch (\texttt{torch.optim.AdamW}).
+
+\subsection{Shapley Values}\label{sec:shapley}
+
+To analyse the importance of individual image patches, we use Shapley values, a concept from cooperative game theory discussed in the lecture \textit{Explainable AI}. The basic idea is to measure how much a feature contributes to a model's prediction by comparing predictions with and without that feature. For each feature $j$, two modified instances $x_{i,+j}$ and $x_{i,-j}$ are created using a reference instance $z$ and a random feature permutation, and the difference in model predictions $f(x_{i,+j}) - f(x_{i,-j})$ is calculated. This process is repeated $M$ times, and the average difference estimates the Shapley value:
+\[
+\phi_j(x) = \frac{1}{M}\sum_{i=1}^{M}
+\left(f(x_{i,+j})-f(x_{i,-j})\right).
+\]
+In our case, each image patch represents one feature, allowing us to visualise its contribution to the model's prediction using a heatmap.
 
 \subsection{Experimental Setup}
-The model used these hyperparameter (table) : parser.add_argument("--batch_size", default=512, type=int)
-    parser.add_argument("--num_workers", default=4, type=int)
 
-    parser.add_argument("--patch_size", default=4, type=int)
-    parser.add_argument("--hidden_dim", default=768, type=int)
-    parser.add_argument("--num_heads", default=12, type=int)
-    parser.add_argument("--depth", default=6, type=int)
-    parser.add_argument("--mlp_mult", default=4, type=int)
-    parser.add_argument("--seed", default=42, type=int)
+We vary the hidden dimension $D\in\{96,192,384,768\}$ and the depth $L\in\{2,4,6\}$. The number of heads is fixed to $h=6$, so the head dimension grows with $D$. This gives 12 architectures with $0.24$\,M to $42.6$\,M parameters. Each architecture is trained with and without augmentation (24 configurations) and with the seeds 42, 43 and 44, resulting in $24\times3=72$ runs.
 
-    parser.add_argument("--epochs", default=50, type=int)
-    parser.add_argument("--optimizer",choices=["SGD", "AdamW"],default="AdamW",type=str)
-    parser.add_argument("--lr", default=0.001, type=float)
-    parser.add_argument("--warmup_epochs", default=5, type=int)
-    parser.add_argument("--momentum", default=0.9, type=float)
-    parser.add_argument("--weight_decay", default=0.0, type=float)
-    parser.add_argument("--no_augment", action="store_true")
+All other hyperparameters are shared (Table~\ref{tab:hparams}). We use AdamW with a linear warm-up followed by a cosine decay of the learning rate. All experiments ran on a single NVIDIA RTX 4500 Ada Generation GPU (CUDA 12.2).
 
-    with AdamW optimizer. With variing hidden-dim € {96, 192, 384, 784} and varring depth {2, 4, 6}, compared the augmented and the non augmented runs, resulting in 12 x 2 = 24 runs.
-    Both models were trained on a single GPU NVIDIA RTX 4500 Ada Generation with CUDA Version: 12.2.
-\section{Results} \label{result}
-table_augment( hd  nh  depth  n params (M) test_final (%) test_best (%) train (%) gap (pp)  loss best_ep
- 96   6      2  3       0.24   75.95 ± 0.23  76.13 ± 0.15     70.04    -5.91 0.844      95
- 96   6      4  3       0.46   81.33 ± 0.09  81.49 ± 0.20     78.27    -3.07 0.617      94
- 96   6      6  3       0.68   83.03 ± 0.52  83.16 ± 0.46     81.33    -1.70 0.531      92
-192   6      2  3       0.91   81.12 ± 0.29  81.17 ± 0.33     78.78    -2.33 0.601      97
-192   6      4  3       1.80   85.78 ± 0.27  85.79 ± 0.29     88.12     2.34 0.345      94
-192   6      6  3       2.69   87.01 ± 0.35  87.05 ± 0.34     91.11     4.10 0.257      90
-384   6      2  3       3.60   83.06 ± 0.36  83.17 ± 0.26     85.66     2.60 0.411      94
-384   6      4  3       7.15   87.98 ± 0.30  88.11 ± 0.32     92.86     4.87 0.208      91
-384   6      6  3      10.70   88.61 ± 0.06  88.69 ± 0.01     94.38     5.77 0.164      96
-768   6      2  3      14.27   83.26 ± 0.18  83.34 ± 0.25     86.59     3.32 0.385      96
-768   6      4  3      28.45   88.68 ± 0.32  88.75 ± 0.26     93.72     5.04 0.184      98
-768   6      6  3      42.62   88.06 ± 0.99  88.15 ± 1.00     92.74     4.68 0.208      95)
+\begin{table}[H]
+\centering\small
+\caption{Hyperparameters shared by all runs.}
+\label{tab:hparams}
+\begin{tabular}{lllc}
+\toprule
+Hyperparameter & Value & Hyperparameter & Value \\
+\midrule
+Patch size $P$ & 4 & Peak learning rate & $5\cdot10^{-4}$ \\
+Attention heads $h$ & 6 & Weight decay & 0.05 \\
+MLP expansion $m$ & 4 & Warm-up & 5 ep.\ (linear) \\
+Optimiser & AdamW & Schedule & cosine to $10^{-6}$ \\
+Batch size & 512 & Epochs & 100 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-table_non_augment(
-     d  nh  depth  n params (M) test_final (%) test_best (%) train (%) gap (pp)  loss best_ep      ep100
- 96   6      2  3       0.24   64.34 ± 0.18  65.67 ± 0.32    100.00    35.66 0.001      20 54 (52-56)
- 96   6      4  3       0.46   67.34 ± 0.70  67.39 ± 0.72    100.00    32.66 0.000      79 47 (46-47)
- 96   6      6  3       0.68   68.68 ± 0.27  68.70 ± 0.28    100.00    31.32 0.000      84 52 (50-55)
-192   6      2  3       0.91   66.86 ± 0.52  66.90 ± 0.50    100.00    33.14 0.000      81 38 (36-39)
-192   6      4  3       1.80   70.02 ± 0.21  70.06 ± 0.25    100.00    29.98 0.000      85 49 (45-51)
-192   6      6  3       2.69   70.71 ± 0.37  70.75 ± 0.40    100.00    29.29 0.000      89 58 (56-61)
-384   6      2  3       3.60   68.39 ± 0.88  68.41 ± 0.86    100.00    31.61 0.000      81 50 (48-53)
-384   6      4  3       7.15   70.72 ± 0.73  70.72 ± 0.74    100.00    29.28 0.000      89 60 (57-61)
-384   6      6  3      10.70   70.89 ± 0.64  70.90 ± 0.62    100.00    29.11 0.000      92 64 (62-66)
-768   6      2  3      14.27   66.95 ± 0.62  66.96 ± 0.61    100.00    33.05 0.000      89 56 (53-61)
+\section{Results}
+\label{result}
 
-... hier fehlen noch 5 runs % Die Spalte ep100 zeigt Mittel (min-max) der ersten Epoche mit train_acc >= THRESH. Bei [k/n] haben nur k von n Seeds den Wert erreicht, bei nie keiner.
-)
+Table~\ref{tab:results} reports the final test accuracy (mean $\pm$ std over three seeds) and the generalisation gap (train $-$ test accuracy, in percentage points) for all 24 configurations. The training accuracy is measured on the (augmented) training images of the last epoch.
 
-images mit Shapely Values die Heatmap der Patches zeigen.
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\caption{Final test accuracy (\%) and generalisation gap (pp) for all configurations, mean $\pm$ std over three seeds.}
+\label{tab:results}
+\begin{tabular}{rrr rr rr}
+\toprule
+ & & & \multicolumn{2}{c}{With augmentation} & \multicolumn{2}{c}{No augmentation} \\
+\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+$D$ & $L$ & Params (M) & Test & Gap & Test & Gap \\
+\midrule
+ 96 & 2 &  0.24 & $75.95 \pm 0.23$ & $-5.91$ & $64.34 \pm 0.18$ & $35.66$ \\
+ 96 & 4 &  0.46 & $81.33 \pm 0.09$ & $-3.07$ & $67.34 \pm 0.70$ & $32.66$ \\
+ 96 & 6 &  0.68 & $83.03 \pm 0.52$ & $-1.70$ & $68.68 \pm 0.27$ & $31.32$ \\
+192 & 2 &  0.91 & $81.12 \pm 0.29$ & $-2.33$ & $66.86 \pm 0.52$ & $33.14$ \\
+192 & 4 &  1.80 & $85.78 \pm 0.27$ & $2.34$  & $70.02 \pm 0.21$ & $29.98$ \\
+192 & 6 &  2.69 & $87.01 \pm 0.35$ & $4.10$  & $70.71 \pm 0.37$ & $29.29$ \\
+384 & 2 &  3.60 & $83.06 \pm 0.36$ & $2.60$  & $68.39 \pm 0.88$ & $31.61$ \\
+384 & 4 &  7.15 & $87.98 \pm 0.30$ & $4.87$  & $70.72 \pm 0.73$ & $29.28$ \\
+384 & 6 & 10.70 & $88.61 \pm 0.06$ & $5.77$  & $70.89 \pm 0.64$ & $29.11$ \\
+768 & 2 & 14.27 & $83.26 \pm 0.18$ & $3.32$  & $66.95 \pm 0.62$ & $33.05$ \\
+768 & 4 & 28.45 & $88.68 \pm 0.32$ & $5.04$  & $69.84 \pm 0.57$ & $30.16$ \\
+768 & 6 & 42.62 & $88.06 \pm 0.99$ & $4.68$  & $71.01 \pm 0.23$ & $28.99$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-3 Bereiche: 
-    depth and hiddendim does help the model to generalize. It does still overfit, but the accuracy increasis to 88.61. depth seems to always help the model, (currently testing on epochs 200 as the model didnt converge, highest hidden_dim, highest depth, highest num_heads)
-    augment vs non_augment. non_augment did perform way worse than expected. The models memorize the data completely, interestengly the smallest model even after 20 epochs.
-    images mit Shapely Values die Heatmap der Patches zeigen. comparasion of small and big models. I assume, that small models will also try to learn the background (plane -> sky) and the big models will try to segment the object to classify from the background.
+\subsection{Effect of model capacity}
+
+With augmentation, both width and depth improve the test accuracy. The smallest model ($D=96$, $L=2$, 0.24\,M parameters) reaches $75.95\,\%$, while the best 100-epoch models reach $88.6\,\%$. Depth helps consistently: for every hidden dimension, going from $L=2$ to $L=4$ gives a large gain (between $+4.7$ and $+5.4$\,pp for $D\geq192$), and $L=6$ adds a further $0.6$ to $1.7$\,pp. The only exception is $D=768$, where $L=6$ is not better than $L=4$. Increasing the width shows diminishing returns. At $L=2$ the accuracy rises from $75.95\,\%$ ($D=96$) to $81.12\,\%$ ($D=192$) and $83.06\,\%$ ($D=384$), but only to $83.26\,\%$ for $D=768$.
+
+The generalisation gap shows the same picture. The smallest models have a negative gap, i.e.\ their accuracy on the augmented training images is lower than on the test set, so they are underfitting. From $D=192$, $L=4$ on, the gap becomes positive and grows with capacity (up to $5.8$\,pp), meaning that larger models start to fit the augmented training data better than unseen data. Still, even the largest models overfit only mildly in this setting.
+
+The largest model ($D=768$, $L=6$) is the exception to the trend. Its test accuracy of $88.06 \pm 0.99\,\%$ is lower and noticeably less stable than that of the smaller models. We assume that this is not a real capacity limit but a lack of training: with 42.6\,M parameters and strong augmentation, 100 epochs are not enough for convergence. To test this, we trained the same configuration for 300 epochs. The training then converged during the last ${\sim}10$ epochs and reached a test accuracy of $91.54\,\%$. Note that this run is not part of Table~\ref{tab:results}, since it uses a different schedule.
+
+\subsection{Effect of data augmentation}
+
+Without augmentation, all models memorise the training set: every configuration reaches $100\,\%$ training accuracy with a training loss of almost zero, and the test accuracy stays between $64.3\,\%$ and $71.0\,\%$. The generalisation gap is therefore $29$ to $36$\,pp for all models. Remarkably, this also holds for the smallest model with only 0.24\,M parameters, which already memorises the training set after roughly 50 epochs. Its test accuracy even peaks early (best epoch 20, $65.67\,\%$) and then declines to $64.34\,\%$ at the end of training, a typical sign of overfitting.
+
+In this regime, additional capacity helps only slightly and saturates quickly. The test accuracy increases from $64.3\,\%$ to about $71\,\%$, and the models with $D\geq192$ and $L\geq4$ all lie within about $1$\,pp of each other. The model with the most parameters is therefore not clearly better than a model that is 15 times smaller (e.g.\ $D=384$, $L=6$: $70.89\,\%$ vs.\ $D=768$, $L=6$: $71.01\,\%$).
+
+Augmentation improves the test accuracy of every configuration, by $+11.6$\,pp (smallest model) up to $+18.8$\,pp ($D=768$, $L=4$). Larger models profit more from augmentation than small ones, which fits the picture that they have more capacity to memorise and therefore need stronger regularisation. For ViTs trained from scratch on a small dataset such as CIFAR-10, augmentation is thus much more important than the choice of architecture.
+
+\subsection{Shapley values}
+
+To see which image regions the models rely on, we estimate patch-wise Shapley values (Section~\ref{sec:shapley}) for a small model ($D=96$, $L=2$) and a large model ($D=768$, $L=6$, trained for 300 epochs) on the same test images. Each of the $8\times8=64$ patches is one feature, the reference instances $z$ are drawn from a pool of training images, and $\phi_j$ is the contribution of patch $j$ to the predicted probability of the true class. Both models are evaluated with the same reference images and permutations, so differences in the heatmaps come from the models and not from the sampling. Figure~\ref{fig:shapley_values} shows the results.
+
+\begin{figure}[H]
+  \centering
+  \begin{minipage}[t]{0.40\linewidth}
+    \vspace{0pt}
+    \centering
+    \includegraphics[width=\linewidth]{images/shapley_values.png}
+    \caption{Comparison of the Shapley values between hd768\_d6 (300 epochs) and hd96\_d2.}
+    \label{fig:shapley_values}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.58\linewidth}
+    \vspace{0pt}
+    \small
+    Both models assign the highest average attributions to the centre of the image. This is expected, since CIFAR-10 objects are mostly centred and the border patches contain mainly background. The centre bias therefore reflects the dataset more than the individual model, and it is the main similarity between the two.
+
+    \smallskip
+    The differences are more subtle. Our hypothesis was that the small model also relies on the background (e.g.\ plane $\rightarrow$ sky), while the large model separates the object from its surroundings. This is only partly supported. The large model also assigns attribution to background patches, so it does not ignore the background completely. However, its high-attribution patches tend to follow the position and shape of the object, so the heatmap points in the ``right direction'' for the given class. The small model's attributions are more diffuse and are spread over object and background alike.
+
+    \smallskip
+    These observations are qualitative and based on a small number of images. Each heatmap is a Monte Carlo estimate with $M=200$ samples per patch, so single patches are noisy and should not be over-interpreted. Also, the two models differ in training length as well as in size, so we cannot attribute the differences to capacity alone.
+  \end{minipage}
+\end{figure}
+
 \section{Discussion}
-...
-\section{Usage of AI} AI tools were used in this report to help me understand the mathematical derivation of the optimizers, improve the phrasing and shortening of certain passages, debug code, and generate code for visualisations. The implementation of the optimizers, the experimental design, and the interpretation of the results were carried out as part of my own work.
 
-Since the primary objective of this report was to explore and understand the differences between gradient-based optimizers, I hope that the use of AI described above is consistent with the assignment requirements.
+\textbf{Capacity.} Our results show that depth and width improve the performance of a ViT trained from scratch, but with diminishing returns. Depth was the more efficient way to add capacity: the $D=192$, $L=6$ model (2.7\,M parameters) is better than the $D=768$, $L=2$ model (14.3\,M parameters) by almost $4$\,pp. Beyond roughly 10\,M parameters, the gains became small within 100 epochs, and the largest model needs a much longer schedule to profit from its size.
+
+\textbf{Augmentation.} The comparison shows that without augmentation the ViT mostly memorises the data, as it lacks the convolutional inductive biases (locality, translation equivariance) that would help it generalise from few examples. Augmentation partly compensates for this, since it effectively enlarges the dataset. The fact that the smallest model already memorises the data shows that the problem is not the model size but the missing regularisation.
+
+\textbf{Limitations.} There is no separate validation set, so the reported test accuracy is the one after the last epoch. All models use the same learning rate and number of epochs, which is probably suboptimal for the largest models. The number of heads is fixed to $h=6$ and does not change the parameter count, so capacity is varied only through $D$ and $L$. The 300-epoch result was obtained for a single configuration only, so we cannot say whether the other large models would also profit from longer training. Finally, three seeds give only a rough estimate of the variance, especially for the less stable large models.
+
+\section{Usage of AI}
+
+AI tools were used in this report to help me understand the mathematical formulation of the ViT and of Shapley values, to improve the phrasing and shorten certain passages, to debug code, and to generate code for the visualisations and the Shapley value analysis. The implementation of the ViT (including the hand-written layer normalisation, attention and loss), the experimental design, and the interpretation of the results were carried out as part of my own work.
+
+Since the primary objective of this project was to explore and understand how model capacity and data augmentation affect a Vision Transformer trained from scratch, and how its predictions can be explained with Shapley values, I hope that the use of AI described above is consistent with the assignment requirements.
